@@ -1,17 +1,48 @@
-import { auth } from "../../lib/firebase";
-import { signOut } from "firebase/auth";
-import Link from "next/link";
+import PostFeed from "@/components/PostFeed";
+import UserProfile from "@/components/userProfile";
+import { getUserWithUsername, postToJSON, firestore } from "@/lib/firebase";
+import {
+  query,
+  collection,
+  where,
+  getDocs,
+  limit,
+  orderBy,
+  getFirestore,
+} from "firebase/firestore";
 
-export default function UserProfilePage({}) {
+export async function getServerSideProps({ query: urlQuery }) {
+  const { username } = urlQuery;
+  const userDoc = await getUserWithUsername(username);
+
+  if (!userDoc) {
+    return {
+      notFound: true,
+    };
+  }
+
+  let user = null;
+  let posts = null;
+  if (userDoc) {
+    user = userDoc.data();
+
+    const postsQuery = query(
+      collection(getFirestore(), userDoc.ref.path, "posts"),
+      where("published", "==", true),
+      orderBy("createdAt", "desc"),
+      limit(5)
+    );
+    posts = (await getDocs(postsQuery)).docs.map(postToJSON);
+  }
+
+  return { props: { user, posts } };
+}
+
+export default function UserProfilePage({ user, posts }) {
   return (
     <main>
-      <h1>userprofile</h1>
-      <Link href="/">
-        <SignOutButton />
-      </Link>
+      <UserProfile user={user} />
+      <PostFeed posts={posts} />
     </main>
   );
-  function SignOutButton() {
-    return <button onClick={() => signOut(auth)}>Sign Out</button>;
-  }
 }
